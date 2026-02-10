@@ -13,7 +13,22 @@ app.use(express.json());
 
 app.use("/api/projects", projectRoutes);
 
+const allowedOrigins = [
+  'http://localhost:5173', // للتطوير المحلي
+  'https://portfolio-yourusername.vercel.app' // ✅ حط رابط Frontend هنا
+];
 
+app.use(cors({
+  origin: function(origin, callback) {
+    // السماح بالـ requests من المصادر المسموحة
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 // ✅ للتطوير المحلي
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 3001;
