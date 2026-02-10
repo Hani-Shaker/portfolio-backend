@@ -13,9 +13,6 @@ app.use(express.json());
 
 app.use("/api/projects", projectRoutes);
 
-app.get("/", (req, res) => {
-  res.json({ message: "Backend is running! 🚀" });
-});
 
 // ✅ للتطوير المحلي
 if (process.env.NODE_ENV !== 'production') {
