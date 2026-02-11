@@ -3,6 +3,7 @@ import cors from "cors";
 import "dotenv/config";
 import connectDB from "./config/db.js";
 import projectRoutes from "./routes/projectRoutes.js";
+import surveyRoutes from "./routes/surveyRoutes.js";
 
 connectDB();
 const app = express();
@@ -12,6 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/projects", projectRoutes);
+app.use("/api/survey", surveyRoutes);
 
 const allowedOrigins = [
   'http://localhost:5173', // للتطوير المحلي
