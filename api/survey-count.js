@@ -1,35 +1,7 @@
-import mongoose from 'mongoose';
-
-let cached = global.mongoose;
-
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
-}
-
-async function connectDB() {
-  if (cached.conn) return cached.conn;
-
-  if (!cached.promise) {
-    cached.promise = mongoose.connect(process.env.MONGO_URI, {
-      bufferCommands: false,
-    }).then((mongoose) => {
-      console.log('✅ MongoDB Connected');
-      return mongoose;
-    });
-  }
-
-  cached.conn = await cached.promise;
-  return cached.conn;
-}
-
-const siteStatsSchema = new mongoose.Schema({
-  totalVisitors: { type: Number, default: 0 },
-  lastUpdated: { type: Date, default: Date.now }
-});
-
-const SiteStats = mongoose.models.SiteStats || mongoose.model('SiteStats', siteStatsSchema);
+import { connectDB, SiteStats } from '../lib/db.js';
 
 export default async function handler(req, res) {
+  // CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -53,6 +25,7 @@ export default async function handler(req, res) {
       await stats.save();
     }
 
+    console.log('✅ Visitor count:', stats.totalVisitors);
     return res.status(200).json({
       totalVisitors: stats.totalVisitors
     });

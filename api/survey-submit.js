@@ -1,47 +1,7 @@
-import mongoose from 'mongoose';
+import { connectDB, Survey, SiteStats } from '../lib/db.js';
 import nodemailer from 'nodemailer';
 
-let cached = global.mongoose;
-
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
-}
-
-async function connectDB() {
-  if (cached.conn) return cached.conn;
-
-  if (!cached.promise) {
-    cached.promise = mongoose.connect(process.env.MONGO_URI, {
-      bufferCommands: false,
-    }).then((mongoose) => {
-      console.log('✅ MongoDB Connected');
-      return mongoose;
-    });
-  }
-
-  cached.conn = await cached.promise;
-  return cached.conn;
-}
-
-const surveySchema = new mongoose.Schema({
-  source: { type: String, required: true },
-  userType: { type: String, required: true },
-  email: String,
-  userId: { type: String, required: true, unique: true },
-  ipAddress: String,
-  userAgent: String,
-  submittedAt: { type: Date, default: Date.now }
-}, { timestamps: true });
-
-const Survey = mongoose.models.Survey || mongoose.model('Survey', surveySchema);
-
-const siteStatsSchema = new mongoose.Schema({
-  totalVisitors: { type: Number, default: 0 },
-  lastUpdated: { type: Date, default: Date.now }
-});
-
-const SiteStats = mongoose.models.SiteStats || mongoose.model('SiteStats', siteStatsSchema);
-
+// ========== Email Helper ==========
 async function sendEmailNotification(survey) {
   try {
     const transporter = nodemailer.createTransport({
@@ -65,19 +25,23 @@ async function sendEmailNotification(survey) {
             <p><strong>البريد الإلكتروني:</strong> ${survey.email}</p>
             <p><strong>التاريخ:</strong> ${new Date(survey.submittedAt).toLocaleString('ar-EG')}</p>
             <p><strong>IP Address:</strong> ${survey.ipAddress}</p>
+            <hr>
+            <p style="color: #666; font-size: 12px;">تم الإرسال تلقائيًا من موقعك</p>
           </div>
         </div>
       `
     };
 
     await transporter.sendMail(mailOptions);
-    console.log("✅ Email sent");
+    console.log("✅ Email sent successfully");
   } catch (error) {
-    console.error("❌ Email failed:", error);
+    console.error("❌ Email sending failed:", error);
   }
 }
 
+// ========== Main Handler ==========
 export default async function handler(req, res) {
+  // CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -96,25 +60,32 @@ export default async function handler(req, res) {
   try {
     const { source, userType, email, userId } = req.body;
 
+    console.log('📥 Survey submission:', { source, userType, userId });
+
+    // التحقق من عدم تكرار الاستبيان
     const existingSurvey = await Survey.findOne({ userId });
     if (existingSurvey) {
+      console.log('⚠️ Duplicate survey attempt');
       return res.status(400).json({ 
         success: false,
         message: "لقد أكملت الاستبيان من قبل" 
       });
     }
 
+    // حفظ الاستبيان
     const survey = new Survey({
       source,
       userType,
       email: email || "لم يتم تقديمه",
       userId,
-      ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
-      userAgent: req.headers['user-agent']
+      ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown',
+      userAgent: req.headers['user-agent'] || 'Unknown'
     });
 
     await survey.save();
+    console.log('✅ Survey saved:', survey._id);
 
+    // زيادة عدد الزوار
     let stats = await SiteStats.findOne();
     if (!stats) {
       stats = new SiteStats({ totalVisitors: 1 });
@@ -123,7 +94,9 @@ export default async function handler(req, res) {
       stats.lastUpdated = new Date();
     }
     await stats.save();
+    console.log('✅ Visitor count updated:', stats.totalVisitors);
 
+    // إرسال الإيميل
     await sendEmailNotification(survey);
 
     return res.status(200).json({
@@ -133,7 +106,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('❌ Error:', error);
-    return res.status(error.status || 500).json({ 
+    return res.status(500).json({ 
       success: false,
       message: error.message 
     });
