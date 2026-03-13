@@ -20,6 +20,7 @@ async function sendEmailNotification(survey) {
         <div style="font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4;">
           <div style="background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #19cee6;">استبيان جديد 📋</h2>
+            <p><strong>الاسم:</strong> ${survey.userName}</p>
             <p><strong>من أين عرفتنا:</strong> ${survey.source}</p>
             <p><strong>نوع المستخدم:</strong> ${survey.userType}</p>
             <p><strong>البريد الإلكتروني:</strong> ${survey.email}</p>
@@ -58,9 +59,9 @@ export default async function handler(req, res) {
   await connectDB();
 
   try {
-    const { source, userType, email, userId } = req.body;
+    const {userName, source, userType, email, userId } = req.body;
 
-    console.log('📥 Survey submission:', { source, userType, userId });
+    // console.log('📥 Survey submission:', {userName, source, userType, userId });
 
     // التحقق من عدم تكرار الاستبيان
     const existingSurvey = await Survey.findOne({ userId });
@@ -74,6 +75,7 @@ export default async function handler(req, res) {
 
     // حفظ الاستبيان
     const survey = new Survey({
+      userName,
       source,
       userType,
       email: email || "لم يتم تقديمه",
